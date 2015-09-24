@@ -1,0 +1,91 @@
+---
+title: "Practical Machine Learning - Course Project"
+date: "Thursday, September 24, 2015"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE)
+```
+
+This is the solution to the course project in the practical machine learning class. The data is about persons doing barell lifts correctly or in 5 incorrect ways. We build a model to classify which of these 6 cases has been performed.
+
+Training data needs to be downloaded from https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv and test data from https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv. We assume these files in the working directory and all required packages are installed.  
+
+
+# First we read the training data
+
+```{r}
+trainingDF<-read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+```
+
+# Cleaning the data
+We remove attributes which are mainly NA, also the first 6 attributes which don't describe the quality of the exercise and therefor don't help the classification.
+This cleaning needs to be repeaded with any new data that we want to classify later on.
+
+```{r}
+countNAs<-apply(is.na(trainingDF),2,sum)
+cleanDF<-trainingDF[countNAs<10000]
+
+cleanDF$X<-NULL
+cleanDF$raw_timestamp_part_1<-NULL
+cleanDF$raw_timestamp_part_2<-NULL
+cleanDF$cvtd_timestamp<-NULL
+cleanDF$new_window<-NULL
+cleanDF$num_window<-NULL
+```
+
+# Building a random forest model
+We load the caret library, set a seed for reproduceability and split the data in a training and test set.
+
+```{r}
+library(caret)
+set.seed(123456789)
+inTrain = createDataPartition(cleanDF$classe, p = 3/4)[[1]]
+training = cleanDF[inTrain,]
+testing = cleanDF[-inTrain,]
+modelFit <- train(classe ~.,data= training, method="rf")
+```
+
+# prediction on the test data set and check confusion matrix
+
+```{r}
+predictions<-predict(modelFit,newdata = testing)
+confusionMatrix(predictions,testing$classe)
+```
+Therefore the accuracy is 99%.
+
+# CLassify the 20 observations in the test data
+First we read the data and clean it as before.
+
+```{r}
+testingDF<-read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+testingDF<-testingDF[countNAs<10000]
+
+testingDF$X<-NULL
+testingDF$raw_timestamp_part_1<-NULL
+testingDF$raw_timestamp_part_2<-NULL
+testingDF$cvtd_timestamp<-NULL
+testingDF$new_window<-NULL
+testingDF$num_window<-NULL
+```
+
+The we use the model to classify:
+
+```{r}
+classification<-predict(modelFit,newdata = testingDF)
+```
+
+Now we export the results as suggested in the project description.
+
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(classification)
+```
